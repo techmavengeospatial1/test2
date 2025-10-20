@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@huggingface/transformers": "^3.7.5",
+    "@mkkellogg/gaussian-splats-3d": "^0.4.7",
+    "@ngageoint/geopackage": "^4.2.6",
+    "3d-tiles-renderer": "^0.4.17",
+    "spl.js": "^0.1.2"
+  }
+}
