@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebXR Gaussian Splat Viewer</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #ar-button {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 12px 24px;
+            border: none;
+            background-color: #007bff;
+            color: white;
+            font-size: 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+    </style>
+    <script type="module" src="/node_modules/@mkkellogg/gaussian-splats-3d/dist/gaussian-splats-3d.js"></script>
+</head>
+<body>
+    <canvas id="render-canvas"></canvas>
+    <button id="ar-button">Enter AR</button>
+    <button id="toggle-tiles-button" style="position: absolute; bottom: 20px; left: 20px;">Toggle NY Tiles</button>
+    <button id="toggle-google-tiles-button" style="position: absolute; bottom: 20px; left: 160px;">Toggle Google Tiles</button>
+    <button id="add-note-button" style="position: absolute; top: 20px; left: 20px;">Add Note</button>
+    <button id="save-notes-gpkg-button" style="position: absolute; top: 20px; left: 120px;">Save Notes as GPKG</button>
+    <input type="file" id="model-input" style="position: absolute; top: 60px; left: 20px;" accept=".glb,.gltf-binary">
+    <button id="place-model-button" style="position: absolute; top: 60px; left: 220px;">Place Model</button>
+    <button id="start-listening-button" style="position: absolute; top: 100px; left: 20px;">Start Listening</button>
+    <input type="file" id="gpkg-input" style="position: absolute; top: 140px; left: 20px;" accept=".gpkg">
+    <button id="load-gpkg-button" style="position: absolute; top: 140px; left: 220px;">Load GPKG</button>
+    <button id="show-table-button" style="position: absolute; top: 180px; left: 20px;">Show Table</button>
+    <button id="filter-by-view-button" style="position: absolute; top: 180px; left: 120px;">Filter by View</button>
+    <button id="convert-sld-button" style="position: absolute; top: 180px; left: 240px;">Convert SLD</button>
+    <input type="file" id="mbtiles-input" style="position: absolute; top: 220px; left: 20px;" accept=".mbtiles">
+    <button id="convert-mbtiles-button" style="position: absolute; top: 220px; left: 220px;">Convert MBTiles</button>
+    <div id="table-container" style="display: none; position: absolute; top: 260px; left: 20px; background: white; padding: 10px; border-radius: 5px; max-height: 300px; overflow-y: auto;"></div>
+    <div id="note-form" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px;">
+        <textarea id="note-input" rows="4" cols="50"></textarea><br>
+        <input type="file" id="attachment-input">
+        <button id="save-note-button">Save Note</button>
+    </div>
+    <script type="module" src="main.js"></script>
+</body>
+</html>

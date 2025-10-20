@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "@huggingface/transformers": "^3.7.5",
+    "@mapbox/vector-tile": "^2.0.4",
+    "@mkkellogg/gaussian-splats-3d": "^0.4.7",
+    "@ngageoint/geopackage": "^4.2.6",
+    "3d-tiles-renderer": "^0.4.17",
+    "geostyler-sld-parser": "^8.1.0",
+    "spl.js": "^0.1.2"
+  }
+}
