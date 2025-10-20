@@ -1,11 +1,16 @@
 {
   "dependencies": {
+    "@esri/arcgis-rest-feature-layer": "^3.8.0",
     "@huggingface/transformers": "^3.7.5",
+    "@loaders.gl/core": "^4.3.4",
+    "@loaders.gl/i3s": "^4.3.4",
     "@mapbox/vector-tile": "^2.0.4",
     "@mkkellogg/gaussian-splats-3d": "^0.4.7",
     "@ngageoint/geopackage": "^4.2.6",
     "3d-tiles-renderer": "^0.4.17",
+    "express": "^5.1.0",
     "geostyler-sld-parser": "^8.1.0",
+    "proj4": "^2.19.10",
     "spl.js": "^0.1.2"
   }
 }

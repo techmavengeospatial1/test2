@@ -19,7 +19,7 @@
             cursor: pointer;
         }
     </style>
-    <script type="module" src="/node_modules/@mkkellogg/gaussian-splats-3d/dist/gaussian-splats-3d.js"></script>
+    <script type="module" src="node_modules/@mkkellogg/gaussian-splats-3d/dist/gaussian-splats-3d.js"></script>
 </head>
 <body>
     <canvas id="render-canvas"></canvas>
@@ -33,12 +33,10 @@
     <button id="start-listening-button" style="position: absolute; top: 100px; left: 20px;">Start Listening</button>
     <input type="file" id="gpkg-input" style="position: absolute; top: 140px; left: 20px;" accept=".gpkg">
     <button id="load-gpkg-button" style="position: absolute; top: 140px; left: 220px;">Load GPKG</button>
-    <button id="show-table-button" style="position: absolute; top: 180px; left: 20px;">Show Table</button>
-    <button id="filter-by-view-button" style="position: absolute; top: 180px; left: 120px;">Filter by View</button>
-    <button id="convert-sld-button" style="position: absolute; top: 180px; left: 240px;">Convert SLD</button>
-    <input type="file" id="mbtiles-input" style="position: absolute; top: 220px; left: 20px;" accept=".mbtiles">
-    <button id="convert-mbtiles-button" style="position: absolute; top: 220px; left: 220px;">Convert MBTiles</button>
-    <div id="table-container" style="display: none; position: absolute; top: 260px; left: 20px; background: white; padding: 10px; border-radius: 5px; max-height: 300px; overflow-y: auto;"></div>
+    <input type="text" id="esri-fs-url" style="position: absolute; top: 180px; left: 20px; width: 200px;" placeholder="Esri FeatureServer URL">
+    <button id="load-esri-fs-button" style="position: absolute; top: 180px; left: 220px;">Load Esri FS</button>
+    <input type="text" id="esri-ss-url" style="position: absolute; top: 220px; left: 20px; width: 200px;" placeholder="Esri SceneServer URL">
+    <button id="load-esri-ss-button" style="position: absolute; top: 220px; left: 220px;">Load Esri SS</button>
     <div id="note-form" style="display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 5px;">
         <textarea id="note-input" rows="4" cols="50"></textarea><br>
         <input type="file" id="attachment-input">

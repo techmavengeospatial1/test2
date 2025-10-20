@@ -1,13 +1,13 @@
 import * as THREE from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.180.0/three.module.min.js';
-import * as GaussianSplats3D from '/node_modules/@mkkellogg/gaussian-splats-3d/dist/gaussian-splats-3d.js';
-import { TilesRenderer } from '/node_modules/3d-tiles-renderer/dist/index.js';
-import SPL from '/node_modules/spl.js/dist/spl.js';
+import * as GaussianSplats3D from 'node_modules/@mkkellogg/gaussian-splats-3d/dist/gaussian-splats-3d.js';
+import { TilesRenderer } from 'node_modules/3d-tiles-renderer/dist/index.js';
+import SPL from 'node_modules/spl.js/dist/spl.js';
 import { GLTFLoader } from 'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.180.0/examples/jsm/loaders/GLTFLoader.js';
-import { GeoPackageManager, FeatureTiles } from '/node_modules/@ngageoint/geopackage/dist/geopackage.js';
-import { VectorTile } from '/node_modules/@mapbox/vector-tile/dist/vector-tile.js';
-import Pbf from 'pbf';
-import initSqlJs from 'https://cdn.jsdelivr.net/npm/sql.js@1.4.0/dist/sql-wasm.js';
-import SLDParser from 'geostyler-sld-parser';
+import { GeoPackageManager, FeatureTiles } from 'node_modules/@ngageoint/geopackage/dist/geopackage.js';
+import { queryFeatures } from 'node_modules/@esri/arcgis-rest-feature-layer/dist/esm/query.js';
+import { I3SLoader } from 'node_modules/@loaders.gl/i3s/dist/esm/i3s-loader.js';
+import { load } from 'node_modules/@loaders.gl/core/dist/esm/load.js';
+import proj4 from 'node_modules/proj4/dist/proj4.js';
 
 let renderer, tilesRenderer, googleTilesRenderer, selectedModel;
 let tilesVisible = false;
@@ -83,6 +83,84 @@ function init() {
         }
     });
 
+    let i3sTileset;
+    document.getElementById('load-esri-ss-button').addEventListener('click', async () => {
+        const url = document.getElementById('esri-ss-url').value;
+        if (url) {
+            i3sTileset = await load(url, I3SLoader);
+            scene.add(i3sTileset.root.content.scene);
+        }
+    });
+
+    document.getElementById('load-esri-fs-button').addEventListener('click', () => {
+        const url = document.getElementById('esri-fs-url').value;
+        if (url) {
+            const frustum = new THREE.Frustum();
+            const projScreenMatrix = new THREE.Matrix4();
+            projScreenMatrix.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+            frustum.setFromProjectionMatrix(projScreenMatrix);
+
+            const extent = new THREE.Box3();
+            extent.setFromObject(scene);
+
+            const min = proj4('EPSG:3857', 'EPSG:4326', [extent.min.x, extent.min.y]);
+            const max = proj4('EPSG:3857', 'EPSG:4326', [extent.max.x, extent.max.y]);
+
+            queryFeatures({
+                url: url,
+                geometry: [min[0], min[1], max[0], max[1]],
+                geometryType: 'esriGeometryEnvelope',
+                inSR: 4326,
+                outSR: 4326,
+                f: 'json'
+            }).then(response => {
+                response.features.forEach(feature => {
+                    if (feature.geometry.paths) { // Lines
+                        const material = new THREE.LineBasicMaterial({ color: 0x0000ff });
+                        feature.geometry.paths.forEach(path => {
+                            const geometry = new THREE.BufferGeometry();
+                            const vertices = [];
+                            path.forEach(point => {
+                                const [x, y, z] = proj4('EPSG:4326', 'EPSG:3857', [point[0], point[1], point[2] || 0]);
+                                vertices.push(x, y, z);
+                            });
+                            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                            const line = new THREE.Line(geometry, material);
+                            scene.add(line);
+                        });
+                    } else if (feature.geometry.rings) { // Polygons
+                        const material = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
+                        feature.geometry.rings.forEach(ring => {
+                            const shape = new THREE.Shape();
+                            const vertices = [];
+                            ring.forEach((point, i) => {
+                                const [x, y, z] = proj4('EPSG:4326', 'EPSG:3857', [point[0], point[1], point[2] || 0]);
+                                if (i === 0) {
+                                    shape.moveTo(x, y);
+                                } else {
+                                    shape.lineTo(x, y);
+                                }
+                            });
+                            const geometry = new THREE.ShapeGeometry(shape);
+                            const mesh = new THREE.Mesh(geometry, material);
+                            scene.add(mesh);
+                        });
+                    } else { // Points
+                        const material = new THREE.PointsMaterial({ color: 0x00ff00, size: 0.1 });
+                        const geometry = new THREE.BufferGeometry();
+                        const vertices = [];
+                        const { x, y, z } = feature.geometry;
+                        const [px, py, pz] = proj4('EPSG:4326', 'EPSG:3857', [x, y, z || 0]);
+                        vertices.push(px, py, pz);
+                        geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+                        const points = new THREE.Points(geometry, material);
+                        scene.add(points);
+                    }
+                });
+            });
+        }
+    });
+
     document.querySelector('#toggle-tiles-button').addEventListener('click', () => {
         tilesVisible = !tilesVisible;
         tilesRenderer.group.visible = tilesVisible;
@@ -102,174 +180,12 @@ function init() {
         if (googleTilesRenderer) {
             googleTilesRenderer.update();
         }
+        if (i3sTileset) {
+            i3sTileset.update();
+        }
     }
 
     renderer.setAnimationLoop(renderLoop);
-
-    document.getElementById('convert-mbtiles-button').addEventListener('click', async () => {
-        const mbtilesInput = document.getElementById('mbtiles-input');
-        const file = mbtilesInput.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const SQL = await initSqlJs();
-                const mbtilesDb = new SQL.Database(new Uint8Array(e.target.result));
-
-                const geoPackage = await GeoPackageManager.create();
-                const srs = geoPackage.getSpatialReferenceSystemDao().createWgs84();
-                const contents = geoPackage.getContentsDao().create();
-                contents.table_name = 'tiles';
-                contents.data_type = 'tiles';
-                contents.identifier = 'tiles';
-                contents.srs_id = srs.srs_id;
-
-                const tileMatrixSet = geoPackage.getTileMatrixSetDao().create();
-                tileMatrixSet.contents = contents;
-                tileMatrixSet.srs = srs;
-
-                const tileMatrixDao = geoPackage.getTileMatrixDao();
-                const tiles = mbtilesDb.exec("SELECT DISTINCT zoom_level FROM tiles");
-                tiles[0].values.forEach(zoom => {
-                    const tileMatrix = tileMatrixDao.create();
-                    tileMatrix.contents = contents;
-                    tileMatrix.zoom_level = zoom;
-                    tileMatrix.matrix_width = Math.pow(2, zoom);
-                    tileMatrix.matrix_height = Math.pow(2, zoom);
-                    tileMatrix.tile_width = 256;
-                    tileMatrix.tile_height = 256;
-                    tileMatrixDao.create(tileMatrix);
-                });
-
-                const tileDao = geoPackage.getTileDao('tiles');
-                const tileData = mbtilesDb.exec("SELECT zoom_level, tile_column, tile_row, tile_data FROM tiles");
-                tileData[0].values.forEach(async (row) => {
-                    const [z, x, y, data] = row;
-                    const newRow = tileDao.newRow();
-                    newRow.setZoomLevel(z);
-                    newRow.setTileColumn(x);
-                    newRow.setTileRow(y);
-                    newRow.setTileData(data);
-                    await tileDao.create(newRow);
-                });
-
-                const gpkgData = await geoPackage.export();
-                const blob = new Blob([gpkgData], { type: 'application/geopackage+sqlite3' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = 'converted.gpkg';
-                a.click();
-            };
-            reader.readAsArrayBuffer(file);
-        }
-    });
-
-    document.getElementById('convert-sld-button').addEventListener('click', async () => {
-        const gpkgInput = document.getElementById('gpkg-input');
-        const file = gpkgInput.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                const geoPackage = await GeoPackageManager.open(new Uint8Array(e.target.result));
-                const styles = await geoPackage.getStylesDao().queryForAll();
-                if (styles.length > 0) {
-                    const sld = styles[0].style;
-                    const sldParser = new SLDParser();
-                    const geoStylerStyle = await sldParser.readStyle(sld);
-
-                    await geoPackage.getFeatureStyleExtension().getOrCreateExtension();
-                    const styleDao = geoPackage.getFeatureStyleExtension().getStyleDao();
-                    const styleMappingDao = geoPackage.getFeatureStyleExtension().getStyleMappingDao();
-
-                    const styleRow = styleDao.newRow();
-                    styleRow.setName(geoStylerStyle.name);
-                    styleRow.setColor(geoStylerStyle.rules[0].symbolizer.color);
-                    styleRow.setWidth(geoStylerStyle.rules[0].symbolizer.width);
-                    styleDao.create(styleRow);
-
-                    const mappingRow = styleMappingDao.newRow();
-                    mappingRow.setBaseTableName('tiles');
-                    mappingRow.setGeometryTypeName('point');
-                    mappingRow.setStyleId(styleRow.getId());
-                    styleMappingDao.create(mappingRow);
-                }
-            };
-            reader.readAsArrayBuffer(file);
-        }
-    });
-
-    document.getElementById('filter-by-view-button').addEventListener('click', () => {
-        const frustum = new THREE.Frustum();
-        frustum.setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
-
-        const filteredFeatures = features.filter(feature => {
-            const coordinates = feature.geojson.geometry.coordinates[0];
-            const points = coordinates.map(p => new THREE.Vector3(p[0], 0, p[1]));
-            const box = new THREE.Box3().setFromPoints(points);
-            return frustum.intersectsBox(box);
-        });
-
-        generateTable(filteredFeatures);
-
-        features.forEach(feature => {
-            feature.line.visible = filteredFeatures.includes(feature);
-        });
-    });
-
-    document.getElementById('show-table-button').addEventListener('click', () => {
-        const tableContainer = document.getElementById('table-container');
-        if (tableContainer.style.display === 'none') {
-            tableContainer.style.display = 'block';
-            generateTable(features);
-        } else {
-            tableContainer.style.display = 'none';
-        }
-    });
-
-    function generateTable(features) {
-        const tableContainer = document.getElementById('table-container');
-        tableContainer.innerHTML = '';
-        const table = document.createElement('table');
-        const thead = document.createElement('thead');
-        const tbody = document.createElement('tbody');
-        const headerRow = document.createElement('tr');
-        const headers = ['ID', 'Properties', 'Go To'];
-        headers.forEach(headerText => {
-            const th = document.createElement('th');
-            th.textContent = headerText;
-            headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        features.forEach((feature, index) => {
-            const row = document.createElement('tr');
-            const idCell = document.createElement('td');
-            idCell.textContent = feature.feature.id;
-            row.appendChild(idCell);
-
-            const propsCell = document.createElement('td');
-            propsCell.textContent = JSON.stringify(feature.feature.properties);
-            row.appendChild(propsCell);
-
-            const goToCell = document.createElement('td');
-            const goToButton = document.createElement('button');
-            goToButton.textContent = 'Go To';
-            goToButton.addEventListener('click', () => {
-                const coordinates = feature.geojson.geometry.coordinates[0];
-                const center = coordinates.reduce((acc, c) => [acc[0] + c[0], acc[1] + c[1]], [0, 0]).map(c => c / coordinates.length);
-                camera.position.set(center[0], 5, center[1]);
-                camera.lookAt(center[0], 0, center[1]);
-            });
-            goToCell.appendChild(goToButton);
-            row.appendChild(goToCell);
-
-            tbody.appendChild(row);
-        });
-
-        table.appendChild(tbody);
-        tableContainer.appendChild(table);
-    }
 
     document.getElementById('load-gpkg-button').addEventListener('click', () => {
         const gpkgInput = document.getElementById('gpkg-input');
@@ -278,32 +194,21 @@ function init() {
             const reader = new FileReader();
             reader.onload = async (e) => {
                 const geoPackage = await GeoPackageManager.open(new Uint8Array(e.target.result));
-                const tileTables = geoPackage.getTileTables();
-                if (tileTables.length > 0) {
-                    const tileDao = geoPackage.getTileDao(tileTables[0]);
-                    const grid = new THREE.GridHelper(10, 10);
-                    scene.add(grid);
-
+                const featureTables = geoPackage.getFeatureTables();
+                if (featureTables.length > 0) {
+                    const featureDao = geoPackage.getFeatureDao(featureTables[0]);
+                    const ft = new FeatureTiles(geoPackage, featureDao);
                     for (let z = 0; z < 4; z++) {
                         for (let x = 0; x < Math.pow(2, z); x++) {
                             for (let y = 0; y < Math.pow(2, z); y++) {
-                                const tile = await tileDao.queryForTile(x, y, z);
+                                const tile = await ft.drawTile(x, y, z);
                                 if (tile) {
-                                    const tileData = tile.getTileData();
-                                    const pbf = new Pbf(tileData);
-                                    const vectorTile = new VectorTile(pbf);
-                                    const layer = vectorTile.layers[Object.keys(vectorTile.layers)[0]];
-                                    if (layer) {
-                                        for (let i = 0; i < layer.length; i++) {
-                                            const feature = layer.feature(i);
-                                            const geojson = feature.toGeoJSON(x, y, z);
-                                            const geometry = new THREE.BufferGeometry().setFromPoints(geojson.geometry.coordinates[0].map(p => new THREE.Vector3(p[0], 0, p[1])));
-                                            const material = new THREE.LineBasicMaterial({ color: 0x00ff00 });
-                                            const line = new THREE.Line(geometry, material);
-                                            features.push({ geojson: geojson, feature: feature, line: line });
-                                            scene.add(line);
-                                        }
-                                    }
+                                    const texture = new THREE.CanvasTexture(tile.getImage());
+                                    const material = new THREE.MeshBasicMaterial({ map: texture });
+                                    const plane = new THREE.PlaneGeometry(1, 1);
+                                    const mesh = new THREE.Mesh(plane, material);
+                                    mesh.position.set(x - Math.pow(2,z)/2, 0, y-Math.pow(2,z)/2);
+                                    scene.add(mesh);
                                 }
                             }
                         }
@@ -330,8 +235,6 @@ function init() {
             mediaRecorder.addEventListener('dataavailable', (event) => {
                 const reader = new FileReader();
                 reader.onloadend = () => {
-                    const audio = new Audio(reader.result);
-                    audio.play();
                     voiceWorker.postMessage({ type: 'generate', data: { audio: reader.result } });
                 };
                 reader.readAsDataURL(event.data);

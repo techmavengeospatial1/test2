@@ -1,6 +1,2 @@
 node_modules/
-*.zip
-*.ksplat
-garden/
-stump/
-truck/
+server.log
