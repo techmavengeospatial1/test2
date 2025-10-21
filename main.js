@@ -126,13 +126,13 @@ function init() {
                             });
                             geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
                             const line = new THREE.Line(geometry, material);
+                            line.userData.attributes = feature.attributes;
                             scene.add(line);
                         });
                     } else if (feature.geometry.rings) { // Polygons
                         const material = new THREE.MeshBasicMaterial({ color: 0xff0000, side: THREE.DoubleSide });
                         feature.geometry.rings.forEach(ring => {
                             const shape = new THREE.Shape();
-                            const vertices = [];
                             ring.forEach((point, i) => {
                                 const [x, y, z] = proj4('EPSG:4326', 'EPSG:3857', [point[0], point[1], point[2] || 0]);
                                 if (i === 0) {
@@ -143,6 +143,7 @@ function init() {
                             });
                             const geometry = new THREE.ShapeGeometry(shape);
                             const mesh = new THREE.Mesh(geometry, material);
+                            mesh.userData.attributes = feature.attributes;
                             scene.add(mesh);
                         });
                     } else { // Points
@@ -154,6 +155,7 @@ function init() {
                         vertices.push(px, py, pz);
                         geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
                         const points = new THREE.Points(geometry, material);
+                        points.userData.attributes = feature.attributes;
                         scene.add(points);
                     }
                 });
@@ -171,6 +173,32 @@ function init() {
         if (googleTilesRenderer) {
             googleTilesRenderer.group.visible = googleTilesVisible;
         }
+    });
+
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    renderer.domElement.addEventListener('click', (event) => {
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        raycaster.setFromCamera(mouse, camera);
+        const intersects = raycaster.intersectObjects(scene.children, true);
+        if (intersects.length > 0) {
+            const object = intersects[0].object;
+            if (object.userData.attributes) {
+                const attributeTable = document.getElementById('attribute-table');
+                const attributeContent = document.getElementById('attribute-content');
+                attributeContent.innerHTML = '';
+                for (const [key, value] of Object.entries(object.userData.attributes)) {
+                    attributeContent.innerHTML += `<strong>${key}:</strong> ${value}<br>`;
+                }
+                attributeTable.style.display = 'block';
+            }
+        }
+    });
+
+    document.getElementById('close-attribute-table').addEventListener('click', () => {
+        document.getElementById('attribute-table').style.display = 'none';
     });
 
     const renderLoop = () => {
@@ -207,7 +235,19 @@ function init() {
                                     const material = new THREE.MeshBasicMaterial({ map: texture });
                                     const plane = new THREE.PlaneGeometry(1, 1);
                                     const mesh = new THREE.Mesh(plane, material);
-                                    mesh.position.set(x - Math.pow(2,z)/2, 0, y-Math.pow(2,z)/2);
+                                    mesh.position.set(x - Math.pow(2, z) / 2, 0, y - Math.pow(2, z) / 2);
+
+                                    const geojson = await featureDao.queryForGeoJSONFeaturesInTable('features', {
+                                        minX: x,
+                                        minY: y,
+                                        maxX: x + 1,
+                                        maxY: y + 1
+                                    });
+
+                                    if (geojson.features.length > 0) {
+                                        mesh.userData.attributes = geojson.features[0].properties;
+                                    }
+
                                     scene.add(mesh);
                                 }
                             }
@@ -226,6 +266,13 @@ function init() {
         const { status, output } = e.data;
         if (status === 'complete') {
             handleVoiceCommand(output.text);
+        } else if (status === 'vqa-complete') {
+            const answerDiv = document.getElementById('vqa-answer');
+            answerDiv.innerHTML = output[0].answer;
+            answerDiv.style.display = 'block';
+            setTimeout(() => {
+                answerDiv.style.display = 'none';
+            }, 5000);
         }
     });
 
@@ -249,6 +296,9 @@ function init() {
             document.getElementById('place-model-button').click();
         } else if (lowerCaseCommand.includes('add note')) {
             document.getElementById('add-note-button').click();
+        } else if (lowerCaseCommand.startsWith('what is') || lowerCaseCommand.startsWith('how many') || lowerCaseCommand.startsWith('is there')) {
+            const image = captureCanvas();
+            voiceWorker.postMessage({ type: 'vqa', data: { image: image, question: command } });
         }
     }
 
@@ -371,6 +421,10 @@ function addTagToScene(position, text) {
     sprite.scale.set(0.1, 0.1, 0.1);
     sprite.userData = { text: text };
     scene.add(sprite);
+}
+
+function captureCanvas() {
+    return renderer.domElement.toDataURL();
 }
 
 init();

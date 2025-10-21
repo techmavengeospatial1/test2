@@ -20,3 +20,4 @@ This is a proof-of-concept WebXR application that demonstrates the use of severa
 *   **Model Placement:** The 3D model placement is a proof-of-concept and places the model at a fixed distance in front of the camera. It does not use hit-testing to place the model on a real-world surface.
 *   **Voice Control:** The voice control is a minimal implementation and only recognizes a few hardcoded commands.
 *   **Style Conversion:** The SLD to GeoPackage style conversion is a partial implementation. It can parse the SLD and create the necessary tables, but it does not yet fully populate the tables with all the style information.
+*   **Google Photorealistic 3D Buildings:** This feature requires a valid Google Maps API key. To use it, you must replace the placeholder `"YOUR_API_KEY"` in `main.js` with your own key.
