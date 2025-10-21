@@ -8,6 +8,8 @@ import { queryFeatures } from 'node_modules/@esri/arcgis-rest-feature-layer/dist
 import { I3SLoader } from 'node_modules/@loaders.gl/i3s/dist/esm/i3s-loader.js';
 import { load } from 'node_modules/@loaders.gl/core/dist/esm/load.js';
 import proj4 from 'node_modules/proj4/dist/proj4.js';
+import { kml } from 'node_modules/@tmcw/togeojson/dist/togeojson.es.js';
+import { GeoJsonGeometry } from 'node_modules/three-geojson/dist/three-geojson.js';
 
 let renderer, tilesRenderer, googleTilesRenderer, selectedModel;
 let tilesVisible = false;
@@ -383,6 +385,24 @@ function init() {
         noteForm.style.display = 'block';
     });
 
+    document.getElementById('vector-input').addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                let geojson;
+                if (file.name.endsWith('.kml')) {
+                    const dom = new DOMParser().parseFromString(e.target.result, 'text/xml');
+                    geojson = kml(dom);
+                } else {
+                    geojson = JSON.parse(e.target.result);
+                }
+                renderGeoJSON(geojson);
+            };
+            reader.readAsText(file);
+        }
+    });
+
     document.getElementById('save-note-button').addEventListener('click', () => {
         const noteInput = document.getElementById('note-input');
         const noteText = noteInput.value;
@@ -421,6 +441,15 @@ function addTagToScene(position, text) {
     sprite.scale.set(0.1, 0.1, 0.1);
     sprite.userData = { text: text };
     scene.add(sprite);
+}
+
+function renderGeoJSON(geojson) {
+    geojson.features.forEach(feature => {
+        const { geometry, properties } = feature;
+        const mesh = new THREE.Mesh(new GeoJsonGeometry(geometry), new THREE.MeshBasicMaterial({ color: 'yellow' }));
+        mesh.userData.attributes = properties;
+        scene.add(mesh);
+    });
 }
 
 function captureCanvas() {
