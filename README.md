@@ -1,6 +1,8 @@
-# WebXR Gaussian Splat Viewer
+# WebXR 3D Geospatial Immersive Viewer
+Developed by Jordan Bess Oct 2025 via JULES VIBE CODING https://jules.google.com/session/8868442846435134771/
 
-This is a proof-of-concept WebXR application that demonstrates the use of several technologies to create a rich, interactive 3D mapping experience.
+This is a proof-of-concept WebXR application that demonstrates the use of several technologies
+to create a rich, interactive 3D mapping experience.
 
 ## Features
 
